@@ -39,6 +39,8 @@ function App() {
       });
       setCurrentUser(response.data);
       setUsername('');
+      // Refresh leaderboard to show the new user
+      fetchLeaderboard();
     } catch (error) {
       alert(error.response?.data?.detail || 'Errore nella creazione utente');
     }
