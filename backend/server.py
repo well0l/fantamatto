@@ -1,14 +1,15 @@
-from fastapi import FastAPI, APIRouter
+from fastapi import FastAPI, APIRouter, HTTPException, UploadFile, File
+from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
-from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
 import os
 import logging
 from pathlib import Path
 from pydantic import BaseModel, Field
-from typing import List
+from typing import List, Optional
 import uuid
 from datetime import datetime
+import base64
 
 
 ROOT_DIR = Path(__file__).parent
@@ -27,30 +28,100 @@ api_router = APIRouter(prefix="/api")
 
 
 # Define Models
-class StatusCheck(BaseModel):
+class User(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
-    client_name: str
-    timestamp: datetime = Field(default_factory=datetime.utcnow)
+    username: str
+    total_points: int = 0
+    created_at: datetime = Field(default_factory=datetime.utcnow)
 
-class StatusCheckCreate(BaseModel):
-    client_name: str
+class UserCreate(BaseModel):
+    username: str
 
-# Add your routes to the router instead of directly to app
+class Matto(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    user_id: str
+    username: str
+    photo_data: str  # base64 encoded image
+    nickname: str
+    description: str
+    rarity: str  # "common", "rare", "epic", "legendary"
+    points: int
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+class MattoCreate(BaseModel):
+    user_id: str
+    username: str
+    photo_data: str
+    nickname: str
+    description: str
+    rarity: str
+
+# Rarity points mapping
+RARITY_POINTS = {
+    "common": 10,
+    "rare": 25,
+    "epic": 50,
+    "legendary": 100
+}
+
+# Routes
 @api_router.get("/")
 async def root():
-    return {"message": "Hello World"}
+    return {"message": "Fantamatto API - Caccia ai personaggi più pazzi di Ponza!"}
 
-@api_router.post("/status", response_model=StatusCheck)
-async def create_status_check(input: StatusCheckCreate):
-    status_dict = input.dict()
-    status_obj = StatusCheck(**status_dict)
-    _ = await db.status_checks.insert_one(status_obj.dict())
-    return status_obj
+@api_router.post("/users", response_model=User)
+async def create_user(user_data: UserCreate):
+    # Check if username already exists
+    existing_user = await db.users.find_one({"username": user_data.username})
+    if existing_user:
+        raise HTTPException(status_code=400, detail="Username già esistente!")
+    
+    user_dict = user_data.dict()
+    user_obj = User(**user_dict)
+    await db.users.insert_one(user_obj.dict())
+    return user_obj
 
-@api_router.get("/status", response_model=List[StatusCheck])
-async def get_status_checks():
-    status_checks = await db.status_checks.find().to_list(1000)
-    return [StatusCheck(**status_check) for status_check in status_checks]
+@api_router.get("/users", response_model=List[User])
+async def get_leaderboard():
+    users = await db.users.find().sort("total_points", -1).to_list(100)
+    return [User(**user) for user in users]
+
+@api_router.get("/users/{user_id}", response_model=User)
+async def get_user(user_id: str):
+    user = await db.users.find_one({"id": user_id})
+    if not user:
+        raise HTTPException(status_code=404, detail="Utente non trovato!")
+    return User(**user)
+
+@api_router.post("/matti", response_model=Matto)
+async def create_matto(matto_data: MattoCreate):
+    # Calculate points based on rarity
+    points = RARITY_POINTS.get(matto_data.rarity.lower(), 10)
+    
+    matto_dict = matto_data.dict()
+    matto_dict["points"] = points
+    matto_obj = Matto(**matto_dict)
+    
+    # Insert matto
+    await db.matti.insert_one(matto_obj.dict())
+    
+    # Update user's total points
+    await db.users.update_one(
+        {"id": matto_data.user_id},
+        {"$inc": {"total_points": points}}
+    )
+    
+    return matto_obj
+
+@api_router.get("/matti", response_model=List[Matto])
+async def get_matti():
+    matti = await db.matti.find().sort("created_at", -1).to_list(100)
+    return [Matto(**matto) for matto in matti]
+
+@api_router.get("/matti/user/{user_id}", response_model=List[Matto])
+async def get_user_matti(user_id: str):
+    matti = await db.matti.find({"user_id": user_id}).sort("created_at", -1).to_list(100)
+    return [Matto(**matto) for matto in matti]
 
 # Include the router in the main app
 app.include_router(api_router)
