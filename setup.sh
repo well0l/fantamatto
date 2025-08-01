@@ -135,7 +135,7 @@ log_info "🎨 Configurazione frontend..."
 
 # Crea package.json se non esiste
 if [ ! -f "frontend/package.json" ]; then
-    sudo -u $APP_USER cat > frontend/package.json << 'EOF'
+    sudo -u $APP_USER tee frontend/package.json > /dev/null << 'EOF'
 {
   "name": "fantamatto-frontend",
   "version": "1.0.0",
