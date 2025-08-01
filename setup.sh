@@ -121,7 +121,7 @@ EOF
 fi
 
 # Crea .env backend
-sudo -u $APP_USER cat > backend/.env << EOF
+sudo -u $APP_USER tee backend/.env > /dev/null << EOF
 MONGO_URL=mongodb://localhost:27017
 DB_NAME=fantamatto_db
 EOF
