@@ -95,11 +95,14 @@ if [ ! -d "$APP_DIR/.git" ]; then
     log_info "📥 Clone repository..."
     if [ -z "$GITHUB_REPO" ]; then
         log_warning "Variabile GITHUB_REPO non impostata. Creando struttura manuale..."
-        sudo -u $APP_USER mkdir -p $APP_DIR/backend $APP_DIR/frontend/src/components/ui
+        sudo -u $APP_USER mkdir -p $APP_DIR/backend $APP_DIR/frontend/src/components/ui $APP_DIR/logs
     else
         sudo -u $APP_USER git clone $GITHUB_REPO $APP_DIR
     fi
 fi
+
+# Assicurati che le directory esistano
+sudo -u $APP_USER mkdir -p $APP_DIR/backend $APP_DIR/frontend/src/components/ui $APP_DIR/logs
 
 # 12. Configura backend
 log_info "🔧 Configurazione backend..."
@@ -107,7 +110,7 @@ cd $APP_DIR
 
 # Crea file requirements.txt se non esiste
 if [ ! -f "backend/requirements.txt" ]; then
-    sudo -u $APP_USER cat > backend/requirements.txt << 'EOF'
+    sudo -u $APP_USER tee backend/requirements.txt > /dev/null << 'EOF'
 fastapi==0.104.1
 uvicorn==0.24.0
 motor==3.3.2
