@@ -104,13 +104,15 @@ fi
 # Assicurati che le directory esistano
 sudo -u $APP_USER mkdir -p $APP_DIR/backend $APP_DIR/frontend/src/components/ui $APP_DIR/logs
 
+# ... (prima parte invariata fino a riga 109)
+
 # 12. Configura backend
 log_info "🔧 Configurazione backend..."
 cd $APP_DIR
 
 # Crea file requirements.txt se non esiste
 if [ ! -f "backend/requirements.txt" ]; then
-    sudo -u $APP_USER tee backend/requirements.txt > /dev/null << 'EOF'
+    cat << 'EOF' | sudo -u $APP_USER tee backend/requirements.txt > /dev/null
 fastapi==0.104.1
 uvicorn==0.24.0
 motor==3.3.2
@@ -121,7 +123,7 @@ EOF
 fi
 
 # Crea .env backend
-sudo -u $APP_USER tee backend/.env > /dev/null << EOF
+cat << EOF | sudo -u $APP_USER tee backend/.env > /dev/null
 MONGO_URL=mongodb://localhost:27017
 DB_NAME=fantamatto_db
 EOF
@@ -135,7 +137,7 @@ log_info "🎨 Configurazione frontend..."
 
 # Crea package.json se non esiste
 if [ ! -f "frontend/package.json" ]; then
-    sudo -u $APP_USER tee frontend/package.json > /dev/null << 'EOF'
+    cat << 'EOF' | sudo -u $APP_USER tee frontend/package.json > /dev/null
 {
   "name": "fantamatto-frontend",
   "version": "1.0.0",
@@ -168,12 +170,12 @@ EOF
 fi
 
 # Crea .env frontend
-sudo -u $APP_USER tee frontend/.env > /dev/null << EOF
+cat << EOF | sudo -u $APP_USER tee frontend/.env > /dev/null
 REACT_APP_BACKEND_URL=http://$DOMAIN:8000
 EOF
 
 # Crea vite.config.js
-sudo -u $APP_USER cat > frontend/vite.config.js << 'EOF'
+cat << 'EOF' | sudo -u $APP_USER tee frontend/vite.config.js > /dev/null
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 
@@ -194,7 +196,7 @@ sudo -u $APP_USER bash -c "cd frontend && yarn install"
 
 # 14. Configura PM2
 log_info "🔄 Configurazione PM2..."
-sudo -u $APP_USER cat > $APP_DIR/ecosystem.config.js << 'EOF'
+cat << 'EOF' | sudo -u $APP_USER tee $APP_DIR/ecosystem.config.js > /dev/null
 module.exports = {
   apps: [
     {
@@ -228,12 +230,11 @@ sudo -u $APP_USER bash -c "cd frontend && yarn build"
 
 # 16. Configura Nginx
 log_info "🌐 Configurazione Nginx..."
-sudo cat > /etc/nginx/sites-available/fantamatto << EOF
+cat << EOF | sudo tee /etc/nginx/sites-available/fantamatto > /dev/null
 server {
     listen 80;
     server_name $DOMAIN;
 
-    # Frontend (React)
     location / {
         proxy_pass http://localhost:3000;
         proxy_http_version 1.1;
@@ -246,7 +247,6 @@ server {
         proxy_cache_bypass \$http_upgrade;
     }
 
-    # Backend API
     location /api {
         proxy_pass http://localhost:8000;
         proxy_http_version 1.1;
@@ -259,7 +259,6 @@ server {
         proxy_cache_bypass \$http_upgrade;
     }
 
-    # Security headers
     add_header X-Frame-Options "SAMEORIGIN" always;
     add_header X-XSS-Protection "1; mode=block" always;
     add_header X-Content-Type-Options "nosniff" always;
@@ -268,11 +267,9 @@ server {
 }
 EOF
 
-# Abilita sito
+# Abilita sito e nginx
 sudo ln -sf /etc/nginx/sites-available/fantamatto /etc/nginx/sites-enabled/
 sudo rm -f /etc/nginx/sites-enabled/default
-
-# Test configurazione nginx
 sudo nginx -t
 
 # 17. Configura firewall
@@ -284,19 +281,15 @@ sudo ufw --force enable
 
 # 18. Avvia servizi
 log_info "🚀 Avvio servizi..."
-
-# Riavvia nginx
 sudo systemctl restart nginx
 sudo systemctl enable nginx
-
-# Avvia applicazioni con PM2
 sudo -u $APP_USER bash -c "cd $APP_DIR && pm2 start ecosystem.config.js"
 sudo -u $APP_USER pm2 save
 sudo -u $APP_USER pm2 startup systemd -u $APP_USER --hp /home/$APP_USER
 
 # 19. Crea script di aggiornamento
 log_info "📝 Creazione script di aggiornamento..."
-sudo cat > /usr/local/bin/fantamatto-update << 'EOF'
+cat << 'EOF' | sudo tee /usr/local/bin/fantamatto-update > /dev/null
 #!/bin/bash
 cd /opt/fantamatto
 sudo -u fantamatto git pull
@@ -305,11 +298,10 @@ sudo -u fantamatto bash -c "cd frontend && yarn install && yarn build"
 sudo -u fantamatto pm2 restart all
 echo "✅ Fantamatto aggiornato!"
 EOF
-
 sudo chmod +x /usr/local/bin/fantamatto-update
 
 # 20. Crea script di monitoraggio
-sudo cat > /usr/local/bin/fantamatto-status << 'EOF'
+cat << 'EOF' | sudo tee /usr/local/bin/fantamatto-status > /dev/null
 #!/bin/bash
 echo "🌀 FANTAMATTO STATUS"
 echo "==================="
@@ -325,10 +317,9 @@ sudo systemctl status nginx --no-pager -l
 echo
 echo "🔗 URL: http://$(curl -s ifconfig.me || echo 'YOUR_IP')"
 EOF
-
 sudo chmod +x /usr/local/bin/fantamatto-status
 
-# 21. Setup completato
+# 21. Fine setup
 log_success "🎉 Setup completato!"
 echo
 echo "📍 INFORMAZIONI IMPORTANTI:"
@@ -344,8 +335,5 @@ echo "• Stato servizi: fantamatto-status"
 echo "• Aggiorna app: fantamatto-update"
 echo "• Log PM2: sudo -u $APP_USER pm2 logs"
 echo "• Riavvia app: sudo -u $APP_USER pm2 restart all"
-echo
-echo "🚀 L'applicazione dovrebbe essere accessibile a:"
-echo "   http://$(curl -s ifconfig.me 2>/dev/null || echo 'YOUR_SERVER_IP')"
 echo
 log_success "🌀 FANTAMATTO è pronto per la caccia ai matti di Ponza! 🏝️"
