@@ -168,7 +168,7 @@ EOF
 fi
 
 # Crea .env frontend
-sudo -u $APP_USER cat > frontend/.env << EOF
+sudo -u $APP_USER tee frontend/.env > /dev/null << EOF
 REACT_APP_BACKEND_URL=http://$DOMAIN:8000
 EOF
 
